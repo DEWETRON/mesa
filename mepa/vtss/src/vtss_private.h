@@ -1,7 +1,15 @@
 // Copyright (c) 2004-2020 Microchip Technology Inc. and its subsidiaries.
 // SPDX-License-Identifier: MIT
 
-#define MEPA_RC(expr) { mesa_rc __rc__ = (expr); if (__rc__ < MESA_RC_OK) return __rc__; }
+#define MEPA_RC(expr) \
+{ \
+    mesa_rc __rc__ = (expr); \
+    if (__rc__ < MESA_RC_OK) \
+    { \
+        T_E(0, MEPA_TRACE_GRP_GEN, "Error : '" #expr "' rc = %d", __rc__); \
+        return __rc__; \
+    } \
+}
 
 // Trace macros
 #define T_D(data, grp, format, ...) MEPA_trace(grp, MEPA_TRACE_LVL_DEBUG, __FUNCTION__, __LINE__, format, ##__VA_ARGS__);

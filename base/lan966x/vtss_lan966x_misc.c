@@ -416,6 +416,11 @@ static vtss_rc lan966x_sgpio_conf_set(vtss_state_t *vtss_state,
 #if defined(GCB_SIO_CFG)
     u32 i, port, val = 0, msk, bmode[2], bit_idx, cfg;
 
+    //original value
+    const u32 sio_clk_freq_div = 20;
+    //lan9668cfg.py @ 1038
+    //const u32 sio_clk_freq_div = 16;
+
     // Serial IO port enable register
     for (port = 0; port < 32; port++) {
         if (conf->port_conf[port].enabled)
@@ -461,6 +466,8 @@ static vtss_rc lan966x_sgpio_conf_set(vtss_state_t *vtss_state,
             return VTSS_RC_ERROR;
         }
     }
+#if 0
+    //orignal values
     REG_WRM(GCB_SIO_CFG,
             GCB_SIO_CFG_SIO_BMODE_1(bmode[1]) |
             GCB_SIO_CFG_SIO_BMODE_0(bmode[0]) |
@@ -473,8 +480,25 @@ static vtss_rc lan966x_sgpio_conf_set(vtss_state_t *vtss_state,
             GCB_SIO_CFG_SIO_AUTO_REPEAT_M |
             GCB_SIO_CFG_SIO_PORT_WIDTH_M);
     REG_WR(GCB_SIO_CLOCK,
-           GCB_SIO_CLOCK_SIO_CLK_FREQ(20) |
+           GCB_SIO_CLOCK_SIO_CLK_FREQ(sio_clk_freq_div) |
            GCB_SIO_CLOCK_SYS_CLK_PERIOD(vtss_lan966x_clk_period_ps(vtss_state)/100));
+#else
+    //lan9668cfg.py @ 1041
+    REG_WRM(GCB_SIO_CFG,
+            GCB_SIO_CFG_SIO_BMODE_1(bmode[1]) |
+            GCB_SIO_CFG_SIO_BMODE_0(bmode[0]) |
+            GCB_SIO_CFG_SIO_REDUCED_GAP(1) |
+            GCB_SIO_CFG_SIO_BURST_GAP(9) |
+            GCB_SIO_CFG_SIO_AUTO_REPEAT(1) |
+            GCB_SIO_CFG_SIO_PORT_WIDTH(conf->bit_count - 1),
+            GCB_SIO_CFG_SIO_BMODE_1_M |
+            GCB_SIO_CFG_SIO_BMODE_0_M |
+            GCB_SIO_CFG_SIO_AUTO_REPEAT(1) |
+            GCB_SIO_CFG_SIO_PORT_WIDTH(3));
+    REG_WR(GCB_SIO_CLOCK,
+           GCB_SIO_CLOCK_SIO_CLK_FREQ(sio_clk_freq_div) |
+           GCB_SIO_CLOCK_SYS_CLK_PERIOD(vtss_lan966x_clk_period_ps(vtss_state)/100));
+#endif
 
     for (port = 0; port < 32; port++) {
         cfg = GCB_SIO_PORT_CFG_PWM_SOURCE(0);

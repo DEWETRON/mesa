@@ -34,7 +34,8 @@ static mscc_appl_trace_group_t trace_groups[TRACE_GROUP_CNT] = {
     // TRACE_GROUP_DEFAULT
     {
         .name = "default",
-        .level = MESA_TRACE_LEVEL_ERROR
+        //.level = MESA_TRACE_LEVEL_ERROR
+        .level = MESA_TRACE_LEVEL_INFO
     },
 };
 meba_inst_t meba_global_inst;
@@ -301,6 +302,8 @@ static void port_setup(mesa_port_no_t port_no, mesa_bool_t aneg, mesa_bool_t ini
     mepa_conf_t             phy;
     meba_port_cap_t         cap = entry->meba.cap;
 
+    mesa_bool_t init_phy = (entry->meba.map.miim_controller != MESA_MIIM_CONTROLLER_NONE);
+
     if (mesa_port_conf_get(NULL, port_no, &conf) != MESA_RC_OK) {
         T_E("mesa_port_conf_get(%u) failed", port_no);
         return;
@@ -358,9 +361,17 @@ static void port_setup(mesa_port_no_t port_no, mesa_bool_t aneg, mesa_bool_t ini
                     phy.fdx = pc->fdx;
                 }
             }
-            if (meba_phy_conf_set(meba_global_inst, port_no, &phy) != MESA_RC_OK) {
-                T_E("meba_phy_conf_set(%u) failed", port_no);
-                return;
+
+            if (init_phy)
+            {
+                if (meba_phy_conf_set(meba_global_inst, port_no, &phy) != MESA_RC_OK) {
+                    T_E("meba_phy_conf_set(%u) failed", port_no);
+                    return;
+                }
+            }
+            else
+            {
+                T_I("port %d, skipping phy init", port_no)
             }
 
             conf.speed = pc->speed;
@@ -1696,31 +1707,47 @@ void port_poll(meba_inst_t inst)
             }
         }
 
-        /* Poll port status and update the status data structure */
-        if (port_status_poll(port_no) != MESA_RC_OK) {
-            entry->valid = FALSE;
-            continue;
-        }
+        if (entry->meba.map.miim_controller != MESA_MIIM_CONTROLLER_NONE)
+        {
+            /* Poll port status and update the status data structure */
+            if (port_status_poll(port_no) != MESA_RC_OK) {
+                entry->valid = FALSE;
+                continue;
+            }
 
-        if (mesa_capability(NULL, MESA_CAP_PORT_KR_IRQ)) {
-            /* Verify KR aneg complete */
-            port_kr_status(port_no, &ps->link);
-        }
+            if (mesa_capability(NULL, MESA_CAP_PORT_KR_IRQ)) {
+                /* Verify KR aneg complete */
+                port_kr_status(port_no, &ps->link);
+            }
 
-        /* Detect link down and disable forwarding on port */
-        if ((!ps->link || ps->link_down) && link_old) {
-            T_I("link down event on port_no: %u", port_no);
-            link_old = 0;
-            mesa_port_state_set(NULL, port_no, FALSE);
-            mesa_mac_table_port_flush(NULL, port_no);
-        }
+            /* Detect link down and disable forwarding on port */
+            if ((!ps->link || ps->link_down) && link_old) {
+                T_I("link down event on port_no: %u", port_no);
+                link_old = 0;
+                mesa_port_state_set(NULL, port_no, FALSE);
+                mesa_mac_table_port_flush(NULL, port_no);
+            }
 
-        /* Detect link up and setup port */
-        if (ps->link && !link_old) {
-            T_I("link up event on port_no: %u spd:%s fdx:%d", port_no, mesa_port_spd2txt(ps->speed), ps->fdx);
-            mesa_port_state_set(NULL, port_no, TRUE);
-            if (port_is_aneg_mode(entry)) {
-                port_setup(port_no, TRUE, FALSE);
+            /* Detect link up and setup port */
+            if (ps->link && !link_old) {
+                T_I("link up event on port_no: %u spd:%s fdx:%d", port_no, mesa_port_spd2txt(ps->speed), ps->fdx);
+                mesa_port_state_set(NULL, port_no, TRUE);
+                if (port_is_aneg_mode(entry)) {
+                    port_setup(port_no, TRUE, FALSE);
+                }
+            }
+        }
+        else
+        {
+            T_N("MESA_MIM_CONTROLLER_NONE port_no %u", port_no);
+            ps->link = TRUE;
+            ps->speed = MESA_SPEED_1G;
+            if (ps->link && !link_old) {
+                T_E("link up event on port_no: %u spd:%s fdx:%d", port_no, mesa_port_spd2txt(ps->speed), ps->fdx);
+                mesa_port_state_set(NULL, port_no, TRUE);
+                if (port_is_aneg_mode(entry)) {
+                    port_setup(port_no, TRUE, FALSE);
+                }
             }
         }
 

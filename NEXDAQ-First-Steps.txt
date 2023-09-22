@@ -1,0 +1,65 @@
+MESA-Experiments:
+
+
+for initial setup follow the document:
+/mesa-master/mesa/docs/getting-started.adoc
+
+info:
+The x86 architecture does not include build of the demos.
+
+====================================
+=== build
+====================================
+
+- Make an arm project:
+
+    $ ./.cmake/create_cmake_project.rb arm <build-folder>
+
+
+- change into the build-folder
+
+- List all available project
+
+    ./cmake .. -LH
+
+- Filter to 966x based ones
+
+    ./cmake .. -LH | grep lan966x
+
+- build so for NEXDAQ lan9668 chip:
+    ./cmake .. -Dlan966x=on
+
+    make -j 22
+
+--  This will make the   liblan966x.so   shared object.
+
+- change folder into mesa/demo
+
+- build the 966x demo-app:
+
+    make . app_lan966x
+    
+--  This will make the   mesa-demo-lan966x   executable.
+
+
+====================================
+=== test:
+====================================
+
+deploy both artifacts on NEQDAQ (for quick testing ~)
+
+set LD_LIBRARY_PATH (if deployed in ~)
+
+start mesa-demo-lan966x
+
+$> mesa-demo-lan966x -s /dev/nexio0
+
+At the current state, the link will get lost almost immediatly.
+
+
+
+
+/meba/src/lan66x/meba.c @56 ppp
+
+Ther is (a part) of the port-configruation.
+NEXDA currently defautlst to ADARO (port_table_adaro)

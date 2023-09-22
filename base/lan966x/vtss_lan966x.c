@@ -229,7 +229,9 @@ static vtss_rc lan966x_restart_conf_set(vtss_state_t *vtss_state)
 
 static vtss_rc lan966x_mux_mode_set(vtss_state_t *vtss_state)
 {
+    VTSS_E("lan966x_mux_mode_set: mux-mode = %d", vtss_state->init_conf.mux_mode);
 #if !defined(VTSS_OPT_FPGA)
+    VTSS_E("lan966x_mux_mode_set before switch");
     switch (vtss_state->init_conf.mux_mode) {
     case VTSS_PORT_MUX_MODE_0:
         // 2xQSGMII

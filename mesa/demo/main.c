@@ -50,7 +50,8 @@ static mscc_appl_trace_group_t trace_groups[TRACE_GROUP_CNT] = {
     // TRACE_GROUP_MEBA
     {
         .name = "meba",
-        .level = MESA_TRACE_LEVEL_ERROR
+        //.level = MESA_TRACE_LEVEL_ERROR
+        .level = MESA_TRACE_LEVEL_INFO
     },
 };
 

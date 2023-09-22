@@ -1420,6 +1420,9 @@ static vtss_rc vtss_phy_detect(vtss_state_t *vtss_state, const vtss_port_no_t po
         model = ((reg3 >> 4) & 0x3F);
         ps->type.revision = (reg3 & 0xF);
         ps->conf_none = (oui == 0x005043 && model == 2 && ps->type.revision == 4 ? 1 : 0);
+
+        VTSS_E("port: %d read oui/model = '%X'/'%X'", port_no, oui, model);
+
         /* Lookup PHY Family and Type */
         if (oui == 0x0001C1) {
             /* Vitesse OUI */
@@ -12218,6 +12221,10 @@ vtss_rc vtss_phy_reset(const vtss_inst_t           inst,
         if (rc == VTSS_RC_OK) {
             rc = vtss_phy_detect_base_ports_private(vtss_state);
         }
+        else 
+        {
+            VTSS_E("vtss_phy_reset, Port:%d step 2 failed with '%d'", port_no, rc);
+        }
 
         if (rc == VTSS_RC_OK) {
             if (vtss_state->phy_state[port_no].type.part_number == VTSS_PHY_TYPE_7435) {
@@ -12235,12 +12242,26 @@ vtss_rc vtss_phy_reset(const vtss_inst_t           inst,
                     rc = vtss_phy_debug_tr_regdump_print(vtss_state, printf, port_no, TRUE);
                 }
 #endif
+                if (rc != VTSS_RC_OK)
+                {
+                    VTSS_E("vtss_phy_reset, Port:%d step 4 failed with '%d'", port_no, rc);                                    
+                }
+
             }
         }
+        else
+        {
+            VTSS_E("vtss_phy_reset, Port:%d step 3 failed with '%d'", port_no, rc);                
+        }
+
 
         if (rc == VTSS_RC_OK) {
             rc = VTSS_RC_COLD(vtss_phy_reset_private(vtss_state, port_no));
         }
+    }
+    else
+    {
+        VTSS_E("vtss_phy_reset, Port:%d step 1 failed with '%d'", port_no, rc);
     }
     VTSS_EXIT();
     return rc;

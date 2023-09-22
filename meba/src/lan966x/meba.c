@@ -21,7 +21,8 @@ typedef enum {
     BOARD_TYPE_8PORT = VTSS_BOARD_LAN9668_8PORT_REF,
     BOARD_TYPE_ENDNODE = VTSS_BOARD_LAN9668_ENDNODE_REF,
     BOARD_TYPE_ENDNODE_CARRIER = VTSS_BOARD_LAN9668_ENDNODE_CARRIER_REF,
-    BOARD_TYPE_EDS2 = VTSS_BOARD_LAN9668_EDS2_REF
+    BOARD_TYPE_EDS2 = VTSS_BOARD_LAN9668_EDS2_REF,
+    BOARD_TYPE_NEXDAQ = VTSS_BOARD_LAN9668_NEXDAQ
 } board_type_t;
 
 /* Local mapping table */
@@ -126,12 +127,22 @@ static port_map_t port_table_svb[] = {
     {4, MESA_MIIM_CONTROLLER_NONE, 0, MESA_PORT_INTERFACE_SGMII_CISCO, CAP_SFP | MEBA_PORT_CAP_SFP_SD_HIGH_NO_DETECT},
 };
 
+static port_map_t port_table_nexdaq[] = {
+    {0, MESA_MIIM_CONTROLLER_1, 1, MESA_PORT_INTERFACE_SGMII, MEBA_PORT_CAP_TRI_SPEED_COPPER},
+    {1, MESA_MIIM_CONTROLLER_1, 2, MESA_PORT_INTERFACE_SGMII, MEBA_PORT_CAP_TRI_SPEED_COPPER},
+    {2, MESA_MIIM_CONTROLLER_NONE, 0, MESA_PORT_INTERFACE_RGMII_ID, MEBA_PORT_CAP_TRI_SPEED_FDX},
+    {3, MESA_MIIM_CONTROLLER_0, 1, MESA_PORT_INTERFACE_RGMII_ID, MEBA_PORT_CAP_TRI_SPEED_COPPER},
+};
+
+
 static mesa_rc lan966x_board_init(meba_inst_t inst)
 {
     meba_board_state_t     *board = INST2BOARD(inst);
     mesa_sgpio_conf_t      conf;
     mesa_sgpio_port_conf_t *pc;
     uint32_t               gpio_no, port;
+
+    T_I(inst, "lan966x_board_init: %x", board->type);
 
     switch (board->type) {
     case BOARD_TYPE_SUNRISE:
@@ -267,6 +278,49 @@ static mesa_rc lan966x_board_init(meba_inst_t inst)
         }
         break;
 
+    case BOARD_TYPE_NEXDAQ:
+        //lan9668cfg.py @ 1028ppp    
+        for (gpio_no = 28; gpio_no < 30; gpio_no++) {
+            (void)mesa_gpio_mode_set(NULL, 0, gpio_no, MESA_GPIO_ALT_0);
+        }
+        sleep(1); // Make sure PHYs are accessible
+
+        //lan9668cfg.py @ 1032ppp
+        (void)mesa_gpio_mode_set(NULL, 0, 61, MESA_GPIO_ALT_2);
+        (void)mesa_gpio_mode_set(NULL, 0, 62, MESA_GPIO_ALT_2);
+        (void)mesa_gpio_mode_set(NULL, 0, 64, MESA_GPIO_ALT_2);
+
+        if (mesa_sgpio_conf_get(NULL, 0, 0, &conf) == MESA_RC_OK) {
+
+            conf.bmode[0] = MESA_SGPIO_BMODE_5;
+            //conf.bmode[1] = 0x2;
+            conf.bit_count = 4;
+ 
+            pc = &conf.port_conf[0];
+            pc->enabled = true;
+
+            pc->mode[0] = MESA_SGPIO_MODE_OFF;  // LED 0 Link
+            pc->mode[1] = MESA_SGPIO_MODE_0_ACTIVITY;   // LED 1 Activity
+            pc->mode[2] = MESA_SGPIO_MODE_OFF;  // LED none
+            pc->mode[3] = MESA_SGPIO_MODE_OFF;  // LED none
+
+
+            pc = &conf.port_conf[1];
+            pc->enabled = true;
+
+            pc->mode[0] = MESA_SGPIO_MODE_OFF;  // LED 3 Link
+            pc->mode[1] = MESA_SGPIO_MODE_0_ACTIVITY;  // LED 4 Activity
+            pc->mode[2] = MESA_SGPIO_MODE_OFF;  // LED none
+            pc->mode[3] = MESA_SGPIO_MODE_OFF;  // LED none
+
+            (void)mesa_sgpio_conf_set(NULL, 0, 0, &conf);
+
+        }
+        else
+        {
+            fprintf(stderr, "CDDsöfksdöfgjdlstgholsdfgh\n");
+        }
+        break;
     default:
         break;
     }
@@ -555,23 +609,39 @@ static mesa_rc lan966x_port_led_update(meba_inst_t inst,
     mesa_sgpio_mode_t  *mode = conf.port_conf[port_no].mode;
     uint32_t           port_max;
 
-    // Only the first 2/4 ports on Endnode/Carrier systems need LED update
-    port_max = (board->type == BOARD_TYPE_ENDNODE ? 2 :
-                board->type == BOARD_TYPE_ENDNODE_CARRIER ? 4 : 0);
-    if (port_no < port_max &&
-        (status->link != old_status->link || status->speed != old_status->speed) &&
-        (rc = mesa_sgpio_conf_get(NULL, 0, 0, &conf)) == MESA_RC_OK) {
-        *old_status = *status; // Save status
-        mode[0] = MESA_SGPIO_MODE_ON; // P0_GR/P1_GR/SFP0_GR/SFP1_GR
-        mode[1] = MESA_SGPIO_MODE_ON; // P0_YEL/P1_YEL/SFP0_RD/SFP1_RD
-        if (status->link) {
-            if (status->speed >= MESA_SPEED_1G) {
-                mode[0] = MESA_SGPIO_MODE_0_ACTIVITY;
-            } else {
-                mode[1] = MESA_SGPIO_MODE_0_ACTIVITY;
+    if (board->type == BOARD_TYPE_NEXDAQ) {
+        port_max = 2;
+        if (port_no < port_max &&
+            (status->link != old_status->link || status->speed != old_status->speed) &&
+            (rc = mesa_sgpio_conf_get(NULL, 0, 0, &conf)) == MESA_RC_OK) {
+            *old_status = *status; // Save status
+            mode[0] = MESA_SGPIO_MODE_OFF;
+            mode[1] = MESA_SGPIO_MODE_0_ACTIVITY;
+            if (status->link) {
+                mode[0] = MESA_SGPIO_MODE_ON;
             }
+            rc = mesa_sgpio_conf_set(NULL, 0, 0, &conf);
         }
-        rc = mesa_sgpio_conf_set(NULL, 0, 0, &conf);
+    }
+    else {
+        // Only the first 2/4 ports on Endnode/Carrier systems need LED update
+        port_max = (board->type == BOARD_TYPE_ENDNODE ? 2 :
+                    board->type == BOARD_TYPE_ENDNODE_CARRIER ? 4 : 0);
+        if (port_no < port_max &&
+            (status->link != old_status->link || status->speed != old_status->speed) &&
+            (rc = mesa_sgpio_conf_get(NULL, 0, 0, &conf)) == MESA_RC_OK) {
+            *old_status = *status; // Save status
+            mode[0] = MESA_SGPIO_MODE_ON; // P0_GR/P1_GR/SFP0_GR/SFP1_GR
+            mode[1] = MESA_SGPIO_MODE_ON; // P0_YEL/P1_YEL/SFP0_RD/SFP1_RD
+            if (status->link) {
+                if (status->speed >= MESA_SPEED_1G) {
+                    mode[0] = MESA_SGPIO_MODE_0_ACTIVITY;
+                } else {
+                    mode[1] = MESA_SGPIO_MODE_0_ACTIVITY;
+                }
+            }
+            rc = mesa_sgpio_conf_set(NULL, 0, 0, &conf);
+        }
     }
     return rc;
 }
@@ -878,7 +948,7 @@ meba_inst_t meba_initialize(size_t callouts_size,
 
     // Allocate pulic state
     if ((inst = meba_state_alloc(callouts,
-                                 "lan9668_adaro",
+                                 "lan9668_nexdaq",
                                  MESA_TARGET_LAN9668,
                                  sizeof(*board))) == NULL) {
         return NULL;
@@ -899,11 +969,14 @@ meba_inst_t meba_initialize(size_t callouts_size,
     if (meba_conf_get_hex(inst, "pcb", &pcb) == MESA_RC_OK) {
         board->type = (board_type_t)pcb;
     } else {
-        board->type = BOARD_TYPE_ADARO;   // Default
+        board->type = BOARD_TYPE_NEXDAQ;   // Default
     }
 
     /* Fill out port mapping table */
     inst->props.mux_mode = MESA_PORT_MUX_MODE_1;
+
+    T_I(inst, "board->type = %u", board->type);
+
     switch (board->type) {
     case BOARD_TYPE_ADARO:
         lan966x_init_port_table(inst, 4, port_table_adaro);
@@ -927,6 +1000,11 @@ meba_inst_t meba_initialize(size_t callouts_size,
         break;
     case BOARD_TYPE_EDS2:
         lan966x_init_port_table(inst, 2, port_table_endnode);
+        break;
+    case BOARD_TYPE_NEXDAQ:
+        inst->props.mux_mode = MESA_PORT_MUX_MODE_2;
+        lan966x_init_port_table(inst, 4, port_table_nexdaq);
+        break;
     default:
         break;
     }

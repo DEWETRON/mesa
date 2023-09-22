@@ -1028,6 +1028,9 @@ static vtss_rc lan966x_port_conf_set(vtss_state_t *vtss_state, const vtss_port_n
         break;
 #if defined(VTSS_OPT_FPGA)
     case VTSS_PORT_INTERFACE_GMII:
+#else
+    //poma test
+    case VTSS_PORT_INTERFACE_GMII:    
 #endif
     case VTSS_PORT_INTERFACE_SGMII:
         sgmii = 1;
@@ -1067,7 +1070,7 @@ static vtss_rc lan966x_port_conf_set(vtss_state_t *vtss_state, const vtss_port_n
         }
         break;
     default:
-        VTSS_E("illegal interface, port %u", port);
+        VTSS_E("illegal interface, port %u / if_type %d", port, conf->if_type);
         return VTSS_RC_ERROR;
     }
 

@@ -271,7 +271,7 @@ API_TARGET(LIB vsc7552TSN            CHIP 7552TSN       DEFS -DVTSS_OPT_PORT_COU
 API_TARGET(LIB vsc7556TSN            CHIP 7556TSN       DEFS -DVTSS_OPT_PORT_COUNT=57)
 API_TARGET(LIB vsc7558TSN            CHIP 7558TSN       DEFS -DVTSS_OPT_PORT_COUNT=57)
 API_TARGET(LIB vsc7558MSEC           CHIP 7558TSN       DEFS -DVTSS_OPT_PORT_COUNT=57)
-API_TARGET(LIB lan966x               CHIP 966X)
+API_TARGET(LIB lan966x               CHIP 966X          DEFS -DVTSS_OPT_TRACE=1 -DVTSS_OPT_DEBUG_PRINT=1)
 API_TARGET(LIB lan966x_lm            CHIP 966X          DEFS -DVTSS_OPT_LIGHT=1 -DVTSS_OPT_TRACE=1 -DVTSS_OPT_DEBUG_PRINT=1)
 API_TARGET(LIB lan966x_ad            CHIP 966X          DEFS -DVTSS_OPT_FPGA=2)
 
@@ -290,7 +290,7 @@ else()
 endif()
 
 if (${BUILD_MESA_DEMO})
-    find_library(JSON_LIB json-c)
+    find_library(JSON_LIB json-c REQUIRED)
     mark_as_advanced(JSON_LIB)
     if (JSON_LIB)
         add_subdirectory(mesa/demo)

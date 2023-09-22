@@ -36,10 +36,10 @@ vtss_trace_conf_t vtss_trace_conf[VTSS_TRACE_GROUP_COUNT] =
         .level = { VTSS_TRACE_LEVEL_ERROR, VTSS_TRACE_LEVEL_ERROR}
     },
     [VTSS_TRACE_GROUP_PORT] = {
-        .level = { VTSS_TRACE_LEVEL_ERROR, VTSS_TRACE_LEVEL_ERROR}
+        .level = { VTSS_TRACE_LEVEL_ERROR, VTSS_TRACE_LEVEL_NOISE}
     },
     [VTSS_TRACE_GROUP_PHY] = {
-        .level = { VTSS_TRACE_LEVEL_ERROR, VTSS_TRACE_LEVEL_ERROR}
+        .level = { VTSS_TRACE_LEVEL_ERROR, VTSS_TRACE_LEVEL_NOISE}
     },
     [VTSS_TRACE_GROUP_PACKET] = {
         .level = { VTSS_TRACE_LEVEL_ERROR, VTSS_TRACE_LEVEL_ERROR}
@@ -66,7 +66,7 @@ vtss_trace_conf_t vtss_trace_conf[VTSS_TRACE_GROUP_COUNT] =
         .level = { VTSS_TRACE_LEVEL_ERROR, VTSS_TRACE_LEVEL_ERROR}
     },
     [VTSS_TRACE_GROUP_REG_CHECK] = {
-        .level = { VTSS_TRACE_LEVEL_ERROR, VTSS_TRACE_LEVEL_ERROR}
+        .level = { VTSS_TRACE_LEVEL_ERROR, VTSS_TRACE_LEVEL_DEBUG}
     },
     [VTSS_TRACE_GROUP_MPLS] = {
         .level = { VTSS_TRACE_LEVEL_ERROR, VTSS_TRACE_LEVEL_ERROR}
@@ -78,7 +78,7 @@ vtss_trace_conf_t vtss_trace_conf[VTSS_TRACE_GROUP_COUNT] =
         .level = { VTSS_TRACE_LEVEL_ERROR, VTSS_TRACE_LEVEL_ERROR}
     },
     [VTSS_TRACE_GROUP_VCAP] = {
-        .level = { VTSS_TRACE_LEVEL_ERROR, VTSS_TRACE_LEVEL_ERROR}
+        .level = { VTSS_TRACE_LEVEL_ERROR, VTSS_TRACE_LEVEL_DEBUG}
     },
     [VTSS_TRACE_GROUP_OAM] = {
         .level = { VTSS_TRACE_LEVEL_ERROR, VTSS_TRACE_LEVEL_ERROR}
@@ -87,7 +87,7 @@ vtss_trace_conf_t vtss_trace_conf[VTSS_TRACE_GROUP_COUNT] =
         .level = { VTSS_TRACE_LEVEL_ERROR, VTSS_TRACE_LEVEL_ERROR}
     },
     [VTSS_TRACE_GROUP_TS] = {
-        .level = { VTSS_TRACE_LEVEL_ERROR, VTSS_TRACE_LEVEL_ERROR}
+        .level = { VTSS_TRACE_LEVEL_ERROR, VTSS_TRACE_LEVEL_NOISE}
     },
     [VTSS_TRACE_GROUP_CLOCK] = {
         .level = { VTSS_TRACE_LEVEL_ERROR, VTSS_TRACE_LEVEL_ERROR}
