@@ -21,6 +21,7 @@
 #include "trace.h"
 #include "cli.h"
 #include "ipc.h"
+#include "ptp.h"
 
 #define ARRSZ(_x_)  (sizeof(_x_) / sizeof((_x_)[0]))
 
@@ -753,7 +754,7 @@ static cli_cmd_t cli_cmd_table[] = {
     },
     {
         "Debug board dump",
-        "Shows boad config",
+        "Shows board config",
         cli_cmd_board_dump
     },
 };
@@ -928,6 +929,8 @@ static void init_modules(mscc_appl_init_t *init)
     mscc_appl_uio_init(init);
     mscc_appl_spi_init(init);
     mscc_appl_intr_init(init);
+    mscc_appl_ptp_init(init);
+
 }
 
 typedef struct {
