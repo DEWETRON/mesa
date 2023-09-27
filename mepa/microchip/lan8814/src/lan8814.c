@@ -2289,6 +2289,7 @@ mepa_drivers_t mepa_lan8814_driver_init()
             .mepa_driver_gpio_mode_set = indy_gpio_mode_set,
             .mepa_driver_gpio_out_set = indy_gpio_out_set,
             .mepa_driver_gpio_in_get = indy_gpio_in_get,
+            .mepa_ts = &indy_ts_drivers,
             .mepa_driver_synce_clock_conf_set = indy_recovered_clk_set,
             .mepa_driver_phy_info_get = indy_info_get,
             .mepa_driver_isolate_mode_conf = indy_isolate_mode_conf,
