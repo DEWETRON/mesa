@@ -7,6 +7,23 @@
 #include <stdio.h>
 
 
+#ifndef TRUE
+#define TRUE 1
+#endif
+
+#ifndef FALSE
+#define FALSE 0
+#endif
+
+
+extern meba_inst_t meba_global_inst;
+
+void log_rc_error(const char* func, mesa_rc rc)
+{
+    fprintf(stderr, "%s : %d", func, rc);
+    cli_printf("%s : %d", func, rc);
+}
+
 /*
 # show ptp
 PTP RS422 clock mode: Disable, delay : 0, Protocol: Serial (Polyt), port: 1
@@ -41,6 +58,7 @@ VirtualPort  Enabled  PTP-State  Io-pin
 */
 static void cli_cmd_ptp_port_show(cli_req_t *req)
 {
+    mesa_rc rc;
     uint32_t port_cnt = mesa_port_cnt(NULL);
 
     // Print header
@@ -65,9 +83,61 @@ static void cli_cmd_ptp_port_show(cli_req_t *req)
         cli_printf("\n");
     }
 
-    for (int i=0; i<port_cnt;++i) {
-        cli_printf("   %i  ", i);
+    for (int port_no=0; port_no<port_cnt;++port_no) {
+        cli_printf("   %i  ", port_no);
+
+        // Enabled
+        {
+            //cli_printf("  FALSE");
+        }
+        
+        // PTP-State
+        {
+            mepa_ts_ptp_clock_conf_t ptpclock_conf;
+            rc = meba_phy_ts_rx_clock_conf_get(meba_global_inst, port_no, 0, &ptpclock_conf);
+            //log_rc_error("meba_phy_ts_rx_clock_conf_get", rc);
+
+            if (ptpclock_conf.enable) {
+                cli_printf("  TRUE ");
+
+                if  (ptpclock_conf.delaym_type == MEPA_TS_PTP_DELAYM_E2E) 
+                {
+                    cli_printf("  e2et");
+                }
+                else {
+                    cli_printf("  p2pt");
+                }
+            }
+            else {
+                cli_printf("  FALSE");
+
+                cli_printf("  dsbl");
+            }
+	                
+        }
+        
+        // Internal
+        {
+            mesa_ts_operation_mode_t mode;
+            rc = mesa_ts_operation_mode_get(0, port_no, &mode);
+            //log_rc_error("mesa_ts_operation_mode_get", rc);
+            switch(mode.mode) {
+            case MESA_TS_MODE_NONE:     cli_printf("       None"); break;
+            case MESA_TS_MODE_EXTERNAL: cli_printf("       FALSE"); break;
+            case MESA_TS_MODE_INTERNAL: cli_printf("       TRUE"); break;
+            default: cli_printf("       UNKN"); break;
+            }
+            {
+                mepa_ts_init_conf_t init_conf;
+                rc = meba_phy_ts_init_conf_get(meba_global_inst, 0, &init_conf);
+                log_rc_error("meba_phy_ts_init_conf_set", rc);
+                //cli_printf(" %d", init_conf.clk_src);
+            }
+        }
+
+        // EOL
         cli_printf("\n");
+
     }
 
 }
@@ -80,6 +150,7 @@ static void cli_cmd_ptp_ext_clock_show(cli_req_t *req)
     mesa_ts_ext_clock_mode_t ext_clock_mode;
     mesa_rc rc;
     rc = mesa_ts_external_clock_mode_get(0, &ext_clock_mode);
+    log_rc_error("mesa_ts_external_clock_mode_get", rc);
 
     cli_printf("PTP External One PPS mode: ");
     switch (ext_clock_mode.one_pps_mode)
@@ -110,6 +181,60 @@ static void cli_cmd_ptp_ext_clock_show(cli_req_t *req)
 
 }
 
+static mesa_vid_t  vid = 100;
+static mesa_ace_id_t acl_id = 1;
+
+
+static void cli_cmd_ptp_setup_transparent_clock(cli_req_t *req)
+{
+    mesa_rc rc;
+
+    mepa_ts_ptp_clock_conf_t ptpclock_conf;
+
+    ptpclock_conf.enable = 1;
+    ptpclock_conf.delaym_type = MEPA_TS_PTP_DELAYM_E2E;
+
+    for (int port_no=0; port_no<4;++port_no) {
+        rc = meba_phy_ts_rx_clock_conf_set(meba_global_inst, port_no, 0, &ptpclock_conf);
+        log_rc_error("meba_phy_ts_rx_clock_conf_set", rc);
+    }
+    //cli_printf("\n");
+
+    {
+        mesa_port_list_t  port_list;
+        mesa_ace_t        ace;
+
+        for (int port_no=0; port_no<4;++port_no)
+        {
+            /* Configure port to C tag aware */
+            mesa_vlan_port_conf_t    vlan_conf;
+            mesa_vlan_port_conf_get(NULL, port_no, &vlan_conf);
+            vlan_conf.port_type = MESA_VLAN_PORT_TYPE_UNAWARE;
+            vlan_conf.pvid = vid;
+            vlan_conf.untagged_vid = vid;
+            vlan_conf.frame_type = MESA_VLAN_FRAME_ALL;
+            mesa_vlan_port_conf_set(NULL, port_no, &vlan_conf);
+        }
+
+
+        mesa_port_list_clear(&port_list);
+        mesa_port_list_set(&port_list, 0, TRUE);
+        mesa_port_list_set(&port_list, 1, TRUE);
+        mesa_port_list_set(&port_list, 2, TRUE);
+        mesa_port_list_set(&port_list, 3, TRUE);
+        mesa_vlan_port_members_set(NULL, vid, &port_list);
+
+        mesa_ace_init(NULL, MESA_ACE_TYPE_IPV4, &ace);
+        ace.id = acl_id;
+        ace.port_list = port_list;
+        ace.action.ptp_action = MESA_ACL_PTP_ACTION_ONE_STEP;
+        ace.action.ptp.sport = 319;
+        mesa_ace_add(NULL, MESA_ACE_ID_LAST, &ace);
+    }
+
+}
+
+
 static cli_cmd_t cli_cmd_table[] = {
     {
         "Ptp show",
@@ -125,6 +250,11 @@ static cli_cmd_t cli_cmd_table[] = {
         "Ptp ext [<clock>]",
         "Print external clock mode",
         cli_cmd_ptp_ext_clock_show
+    },
+    {
+        "Ptp tc [<clock>]",
+        "Configure transparent clock",
+        cli_cmd_ptp_setup_transparent_clock
     },
 };
 
