@@ -14,6 +14,8 @@ extern "C" {
 /* Initialize PTP */
 void mscc_appl_ptp_init(mscc_appl_init_t *init);
 
+/* Configure PTP transparent clock */
+mesa_rc mscc_appl_ptp_setup_tc(const mesa_inst_t inst);
 
 #ifdef __cplusplus
 }

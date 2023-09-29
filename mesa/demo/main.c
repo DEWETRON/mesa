@@ -930,7 +930,6 @@ static void init_modules(mscc_appl_init_t *init)
     mscc_appl_spi_init(init);
     mscc_appl_intr_init(init);
     mscc_appl_ptp_init(init);
-
 }
 
 typedef struct {
@@ -1161,6 +1160,9 @@ int main(int argc, char **argv)
     // Initialize modules
     init->cmd = MSCC_INIT_CMD_INIT;
     init_modules(init);
+
+    // Enable PTP transparent clock
+    mscc_appl_ptp_setup_tc(NULL);
 
     // Initialize fan and chip/board temperature sensors
     if  (MEBA_WRAP(meba_capability, appl_init.board_inst, MEBA_CAP_TEMP_SENSORS)) {

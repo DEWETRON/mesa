@@ -4,6 +4,8 @@
 #include "trace.h"
 #include "cli.h"
 #include "ptp.h"
+#include <microchip/ethernet/switch/api/types.h>
+#include <microchip/ethernet/switch/api/security.h>
 #include <stdio.h>
 
 
@@ -15,6 +17,9 @@
 #define FALSE 0
 #endif
 
+static mesa_vid_t  vid = 100;
+static mesa_ace_id_t acl_id = 1;
+
 
 extern meba_inst_t meba_global_inst;
 
@@ -23,6 +28,9 @@ void log_rc_error(const char* func, mesa_rc rc)
     fprintf(stderr, "%s : %d", func, rc);
     cli_printf("%s : %d", func, rc);
 }
+
+
+void dbg_print_mesa_acl_frame_key_t(mesa_acl_port_conf_t *acl_port_cfg);
 
 /*
 # show ptp
@@ -181,56 +189,24 @@ static void cli_cmd_ptp_ext_clock_show(cli_req_t *req)
 
 }
 
-static mesa_vid_t  vid = 100;
-static mesa_ace_id_t acl_id = 1;
 
 
 static void cli_cmd_ptp_setup_transparent_clock(cli_req_t *req)
 {
     mesa_rc rc;
 
-    mepa_ts_ptp_clock_conf_t ptpclock_conf;
+    rc = mscc_appl_ptp_setup_tc(NULL);
+        
+    log_rc_error("mesa_ace_add", rc);
 
-    ptpclock_conf.enable = 1;
-    ptpclock_conf.delaym_type = MEPA_TS_PTP_DELAYM_E2E;
+    // for (int port_no=0; port_no<4;++port_no)
+    // {
+    //     mesa_acl_port_conf_t acl_port_cfg;
+    //     rc = mesa_acl_port_conf_get(NULL, port_no, &acl_port_cfg);
+    //     log_rc_error("mesa_acl_port_conf_get", rc);
 
-    for (int port_no=0; port_no<4;++port_no) {
-        rc = meba_phy_ts_rx_clock_conf_set(meba_global_inst, port_no, 0, &ptpclock_conf);
-        log_rc_error("meba_phy_ts_rx_clock_conf_set", rc);
-    }
-    //cli_printf("\n");
-
-    {
-        mesa_port_list_t  port_list;
-        mesa_ace_t        ace;
-
-        for (int port_no=0; port_no<4;++port_no)
-        {
-            /* Configure port to C tag aware */
-            mesa_vlan_port_conf_t    vlan_conf;
-            mesa_vlan_port_conf_get(NULL, port_no, &vlan_conf);
-            vlan_conf.port_type = MESA_VLAN_PORT_TYPE_UNAWARE;
-            vlan_conf.pvid = vid;
-            vlan_conf.untagged_vid = vid;
-            vlan_conf.frame_type = MESA_VLAN_FRAME_ALL;
-            mesa_vlan_port_conf_set(NULL, port_no, &vlan_conf);
-        }
-
-
-        mesa_port_list_clear(&port_list);
-        mesa_port_list_set(&port_list, 0, TRUE);
-        mesa_port_list_set(&port_list, 1, TRUE);
-        mesa_port_list_set(&port_list, 2, TRUE);
-        mesa_port_list_set(&port_list, 3, TRUE);
-        mesa_vlan_port_members_set(NULL, vid, &port_list);
-
-        mesa_ace_init(NULL, MESA_ACE_TYPE_IPV4, &ace);
-        ace.id = acl_id;
-        ace.port_list = port_list;
-        ace.action.ptp_action = MESA_ACL_PTP_ACTION_ONE_STEP;
-        ace.action.ptp.sport = 319;
-        mesa_ace_add(NULL, MESA_ACE_ID_LAST, &ace);
-    }
+    //     dbg_print_mesa_acl_frame_key_t(&acl_port_cfg);
+    // }
 
 }
 
@@ -301,3 +277,113 @@ void mscc_appl_ptp_init(mscc_appl_init_t *init)
     }
 }
 
+
+
+mesa_rc mscc_appl_ptp_setup_tc(const mesa_inst_t inst)
+{
+    mesa_rc rc;
+    mesa_port_list_t  port_list;
+    mesa_ace_t        ace;
+
+    mesa_port_list_clear(&port_list);
+    mesa_port_list_set(&port_list, 0, TRUE);
+    mesa_port_list_set(&port_list, 1, TRUE);
+    mesa_port_list_set(&port_list, 2, TRUE);
+    mesa_port_list_set(&port_list, 3, TRUE);
+    mesa_vlan_port_members_set(NULL, vid, &port_list);
+
+    {
+        // configure transparent clock PTP Ethernet
+        rc = mesa_ace_init(NULL, MESA_ACE_TYPE_ETYPE, &ace);
+        ace.id = acl_id;
+        ace.port_list = port_list;
+        ace.action.ptp_action = MESA_ACL_PTP_ACTION_ONE_STEP;
+        rc = mesa_ace_add(NULL, MESA_ACE_ID_LAST, &ace);
+        //log_rc_error("mesa_ace_add", rc);
+    }
+    {
+        // configure transparent clock PTP UDP
+
+        rc = mesa_ace_init(NULL, MESA_ACE_TYPE_IPV4, &ace);
+        ace.id = acl_id+1;
+        ace.port_list = port_list;
+        ace.action.ptp_action = MESA_ACL_PTP_ACTION_ONE_STEP;
+        // UDP
+        ace.frame.ipv4.proto.value = 17;  
+        ace.frame.ipv4.proto.mask = 0xff;
+        ace.frame.ipv4.sport.in_range = 1;
+        // PTP Port
+        ace.frame.ipv4.sport.low = 319;
+        ace.frame.ipv4.sport.high = 319;
+        ace.frame.ipv4.dport = ace.frame.ipv4.sport;
+
+        rc = mesa_ace_add(NULL, MESA_ACE_ID_LAST, &ace);
+        //log_rc_error("mesa_ace_add", rc);
+    }
+    return rc;
+}
+
+
+void dbg_print_mesa_acl_ptp_action_conf_t(mesa_acl_ptp_action_conf_t* ptp)
+{
+    cli_printf("ptp\n");
+    cli_printf("response = %s\n", ptp->response == MESA_ACL_PTP_RSP_NONE ? "MESA_ACL_PTP_RSP_NONE" :
+        ptp->response == MESA_ACL_PTP_RSP_DLY_REQ_RSP_TS_UPD ? "MESA_ACL_PTP_RSP_DLY_REQ_RSP_TS_UPD" : "MESA_ACL_PTP_RSP_DLY_REQ_RSP_NO_TS");
+
+    cli_printf("log_message_interval = %d\n", ptp->log_message_interval);
+    cli_printf("copy_smac_to_dmac = %d\n", ptp->copy_smac_to_dmac);
+    cli_printf("set_smac_to_port_mac = %d\n", ptp->set_smac_to_port_mac);
+    cli_printf("dom_sel = %d\n", ptp->dom_sel);
+    cli_printf("sport = %d\n", ptp->sport);
+    cli_printf("dport = %d\n", ptp->dport);
+
+}
+
+void dbg_print_mesa_acl_action_t(mesa_acl_action_t *action)
+{
+    cli_printf("action\n");
+    cli_printf("cpu = %d\n", action->cpu);
+    cli_printf("cpu_once = %d\n", action->cpu_once);
+    cli_printf("cpu_disable = %d\n", action->cpu_disable);
+    cli_printf("cpu_queue = %d\n", action->cpu_queue);
+    cli_printf("police = %d\n", action->police);
+    cli_printf("policer_no = %d\n", action->policer_no);
+    cli_printf("evc_police = %d\n", action->evc_police);
+    cli_printf("evc_policer_id = %d\n", action->evc_policer_id);
+    cli_printf("learn = %d\n", action->learn);
+
+    cli_printf("port_action = %s\n", action->port_action == MESA_ACL_PORT_ACTION_NONE ? "MESA_ACL_PORT_ACTION_NONE" :
+        action->port_action == MESA_ACL_PORT_ACTION_FILTER ? "MESA_ACL_PORT_ACTION_FILTER" : "MESA_ACL_PORT_ACTION_REDIR");
+    
+    // port_list TODO
+
+    cli_printf("mirror = %d\n", action->mirror);
+    cli_printf("ptp_action = %s\n", action->ptp_action == MESA_ACL_PTP_ACTION_NONE ? "MESA_ACL_PTP_ACTION_NONE" :
+        action->ptp_action == MESA_ACL_PTP_ACTION_ONE_STEP ? "MESA_ACL_PTP_ACTION_ONE_STEP" :
+        action->ptp_action == MESA_ACL_PTP_ACTION_ONE_STEP_ADD_DELAY ? "MESA_ACL_PTP_ACTION_ONE_STEP_ADD_DELAY" :
+        action->ptp_action == MESA_ACL_PTP_ACTION_ONE_STEP_SUB_DELAY_1 ? "MESA_ACL_PTP_ACTION_ONE_STEP_SUB_DELAY_1" :
+        action->ptp_action == MESA_ACL_PTP_ACTION_ONE_STEP_SUB_DELAY_2 ? "MESA_ACL_PTP_ACTION_ONE_STEP_SUB_DELAY_2" :
+        action->ptp_action == MESA_ACL_PTP_ACTION_ONE_AND_TWO_STEP ? "MESA_ACL_PTP_ACTION_ONE_AND_TWO_STEP" :
+        "MESA_ACL_PTP_ACTION_TWO_STEP");
+        
+    dbg_print_mesa_acl_ptp_action_conf_t(&action->ptp);
+
+    // addr TODO
+    cli_printf("lm_cnt_disable = %d\n", action->lm_cnt_disable);
+    cli_printf("mac_swap = %d\n", action->mac_swap);
+    cli_printf("ifh_flag = %d\n", action->ifh_flag);
+}
+
+void dbg_print_mesa_acl_frame_key_t(mesa_acl_port_conf_t *acl_port_cfg)
+{
+    cli_printf("mesa_acl_port_conf_t: %u\n", acl_port_cfg->policy_no);
+   
+    cli_printf("arp =  %s\n", acl_port_cfg->key.arp == MESA_ACL_KEY_DEFAULT ? "MESA_ACL_KEY_DEFAULT" :
+        acl_port_cfg->key.arp == MESA_ACL_KEY_ETYPE ? "MESA_ACL_KEY_ETYPE" : "MESA_ACL_KEY_EXT");
+    cli_printf("ipv4 = %s\n", acl_port_cfg->key.ipv4 == MESA_ACL_KEY_DEFAULT ? "MESA_ACL_KEY_DEFAULT" :
+        acl_port_cfg->key.ipv4 == MESA_ACL_KEY_ETYPE ? "MESA_ACL_KEY_ETYPE" : "MESA_ACL_KEY_EXT");
+    cli_printf("ipv6 = %s\n", acl_port_cfg->key.ipv6 == MESA_ACL_KEY_DEFAULT ? "MESA_ACL_KEY_DEFAULT" :
+        acl_port_cfg->key.ipv6 == MESA_ACL_KEY_ETYPE ? "MESA_ACL_KEY_ETYPE" : "MESA_ACL_KEY_EXT");
+
+    dbg_print_mesa_acl_action_t(&acl_port_cfg->action);
+}
